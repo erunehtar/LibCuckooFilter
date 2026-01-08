@@ -9,6 +9,48 @@ Cuckoo Filter for WoW Lua 5.1 environment - Probabilistic set membership testing
 - Simple API for adding and checking elements.
 - Compatible with World of Warcraft Lua 5.1 environment.
 
+## Performance Comparison
+
+Measured on an AMD Ryzen 9 5900X with 10,000 samples using random strings of length 12.
+
+Smaller time is better. The fastest result is shown in **bold**.
+
+| New | Median | Average | Min | Max | Total |
+| - | - | - | - | - | - |
+| LibBloomFilter | 58.40us | 60.38us | 41.70us | 966.10us | 603.75ms |
+| LibPatternedBloomFilter | 508.90us | 572.17us | 366.00us | 3.88ms | 5721.69ms |
+| **LibCuckooFilter** | 1.00us | 1.34us | 0.70us | 122.60us | 13.41ms |
+
+| Insert | Median | Average | Min | Max | Total |
+| - | - | - | - | - | - |
+| LibBloomFilter | 11.80us | 15.28us | 11.40us | 160.00us | 152.76ms |
+| **LibPatternedBloomFilter** | 2.20us | 2.22us | 2.00us | 19.20us | 22.23ms |
+| LibCuckooFilter | 3.80us | 3.90us | 3.50us | 59.70us | 38.97ms |
+
+| Contains | Median | Average | Min | Max | Total |
+| - | - | - | - | - | - |
+| LibBloomFilter | 11.70us | 11.80us | 11.50us | 29.60us | 117.96ms |
+| **LibPatternedBloomFilter** | 2.20us | 2.19us | 2.00us | 15.20us | 21.94ms |
+| LibCuckooFilter | 3.80us | 3.90us | 3.60us | 16.00us | 39.03ms |
+
+| Export | Median | Average | Min | Max | Total |
+| - | - | - | - | - | - |
+| **LibBloomFilter** | 0.40us | 0.39us | 0.20us | 12.80us | 3.88ms |
+| LibPatternedBloomFilter | 0.40us | 0.40us | 0.30us | 1.90us | 4.01ms |
+| LibCuckooFilter | 707.90us | 756.49us | 571.10us | 2.75ms | 7564.90ms |
+
+| Import | Median | Average | Min | Max | Total |
+| - | - | - | - | - | - |
+| **LibBloomFilter** | 0.90us | 0.88us | 0.70us | 3.60us | 8.84ms |
+| LibPatternedBloomFilter | 406.20us | 448.20us | 319.10us | 2.87ms | 4482.02ms |
+| LibCuckooFilter | 334.10us | 336.10us | 324.70us | 712.90us | 3361.02ms |
+
+## Export Size Comparison
+
+Measured by exporting the filter state after inserting 10,000 values, then serializing with LibSerialize and compressing with LibDeflate.
+
+Smaller is better. The smallest result is shown in **bold**.
+
 ## Installation
 
 To install LibCuckooFilter, simply download the `LibCuckooFilter.lua` file and include it in your WoW addon folder. Then, you can load it using LibStub in your addon code.
