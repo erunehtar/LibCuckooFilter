@@ -20,8 +20,8 @@ local LibCuckooFilter = LibStub("LibCuckooFilter")
 ## Usage
 
 ```lua
--- Create a new Cuckoo Filter with expected 1000 values and 1% false positive rate
-local filter = LibCuckooFilter.New(1000, 0.01)
+-- Create a new Cuckoo Filter with expected 1000 values
+local filter = LibCuckooFilter.New(1000)
 
 -- Add values to the filter
 for i = 1, 1000 do
