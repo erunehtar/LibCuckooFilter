@@ -28,7 +28,7 @@
 --   The Cuckoo filter was invented by Bin Fan, David G. Andersen, Michael Kaminsky,
 --   and Michael D. Mitzenmacher.
 --
--- Optimized for 32-bit Lua environment with partial-key cuckoo hashing.
+-- Optimized for 32-bit Lua environment with partial-key Cuckoo hashing.
 -- Uses FNV-1a hash function and bidirectional XOR-based alternate bucket calculation.
 -- Supports insertion, membership testing, deletion, clear, export/import, and false positive rate estimation.
 
@@ -90,7 +90,7 @@ local function BucketIndex(self, hash)
 end
 
 --- Compute the alternate bucket index for a given index and fingerprint.
---- Uses partial-key cuckoo hashing: i' = (i XOR hash(fp)) mod numBuckets
+--- Uses partial-key Cuckoo hashing: i' = (i XOR hash(fp)) mod numBuckets
 --- This is bidirectional: alternate(alternate(i, fp), fp) = i
 --- @param index number Original bucket index (1-based).
 --- @param fingerprint number Fingerprint value.
@@ -111,7 +111,7 @@ local function AlternateBucketIndex(self, index, fingerprint)
     return alt + 1
 end
 
---- @class LibCuckooFilter LibCuckooFilter data structure.
+--- @class LibCuckooFilter Cuckoo Filter data structure.
 --- @field New fun(capacity: number, bucketSize?: number, fingerprintBits?: number, maxKicks?: number): LibCuckooFilter
 --- @field Insert fun(self: LibCuckooFilter, value: any): boolean
 --- @field Contains fun(self: LibCuckooFilter, value: any): boolean
@@ -119,7 +119,7 @@ end
 --- @field Clear fun(self: LibCuckooFilter)
 --- @field Export fun(self: LibCuckooFilter): number[]
 --- @field Import fun(state: number[]): LibCuckooFilter
---- @field GetFalsePositiveRate fun(self: LibCuckooFilter): number
+--- @field EstimateFalsePositiveRate fun(self: LibCuckooFilter): number
 --- @field numBuckets number Number of buckets in the filter.
 --- @field bucketSize number Number of entries per bucket.
 --- @field fingerprintBits number Number of bits per fingerprint.
@@ -128,7 +128,7 @@ end
 --- @field itemCount number Number of items currently stored.
 --- @field maxKicks number Maximum number of kicks during insertion.
 
---- @class LibCuckooFilterState Compact representation of Cuckoo Filter for export/import.
+--- @class LibCuckooFilterState Compact representation of a Cuckoo Filter state.
 --- @field [1] number Number of buckets in the filter.
 --- @field [2] number Number of entries per bucket.
 --- @field [3] number Number of bits per fingerprint.
@@ -138,7 +138,7 @@ end
 LibCuckooFilter.__index = LibCuckooFilter
 
 --- Create a new Cuckoo Filter instance.
---- @param capacity number Capacity of the Cuckoo Filter (expected number of values).
+--- @param capacity number Capacity of the filter (expected number of values).
 --- @param bucketSize number? Number of entries per bucket (default: 4).
 --- @param fingerprintBits number? Number of bits per fingerprint (default: 12).
 --- @param maxKicks number? Maximum number of kicks during insertion (default: 512).
@@ -164,7 +164,7 @@ function LibCuckooFilter.New(capacity, bucketSize, fingerprintBits, maxKicks)
     }, LibCuckooFilter)
 end
 
---- Insert a value into the cuckoo filter.
+--- Insert a value into the filter.
 --- @param value any Value to insert.
 --- @return boolean success True if insertion succeeded, false if the filter is full.
 function LibCuckooFilter:Insert(value)
@@ -198,7 +198,7 @@ function LibCuckooFilter:Insert(value)
         return true
     end
 
-    -- Both full, relocate using cuckoo eviction
+    -- Both full, relocate using Cuckoo eviction
     local evictIndex = (hash % 2 == 0) and i1 or i2
     local evictFp = fingerprint
 
@@ -228,7 +228,7 @@ function LibCuckooFilter:Insert(value)
     return false -- Filter full after max kicks
 end
 
---- Determine if a value is possibly in the cuckoo filter.
+--- Determine if a value is possibly in the filter.
 --- @param value any Value to check.
 --- @return boolean contains True if value might be in the set, false if definitely not.
 function LibCuckooFilter:Contains(value)
@@ -255,7 +255,7 @@ function LibCuckooFilter:Contains(value)
     return false
 end
 
---- Delete a value from the cuckoo filter.
+--- Delete a value from the filter.
 --- Note: May cause false negatives if the same fingerprint was inserted multiple times.
 --- @param value any Value to delete.
 --- @return boolean success True if deletion succeeded, false if value not found.
@@ -299,14 +299,14 @@ function LibCuckooFilter:Delete(value)
     return false -- Fingerprint not found
 end
 
---- Clear all values from the cuckoo filter.
+--- Clear all values from the filter.
 function LibCuckooFilter:Clear()
     self.buckets = {}
     self.itemCount = 0
 end
 
---- Export the cuckoo filter state to a compact representation.
---- @return LibCuckooFilterState state Compact representation of the cuckoo filter.
+--- Export the current state of the filter.
+--- @return LibCuckooFilterState state Compact representation of the filter.
 function LibCuckooFilter:Export()
     local state = {}
     state[1] = self.numBuckets
@@ -325,9 +325,9 @@ function LibCuckooFilter:Export()
     return state
 end
 
---- Import a new cuckoo filter from a compact representation.
---- @param state LibCuckooFilterState Compact representation of the cuckoo filter.
---- @return LibCuckooFilter instance The imported cuckoo filter instance.
+--- Import a new Cuckoo Filter from a compact representation.
+--- @param state LibCuckooFilterState Compact representation of the filter.
+--- @return LibCuckooFilter instance The imported Cuckoo Filter instance.
 function LibCuckooFilter.Import(state)
     assert(state and type(state) == "table", "state must be a table")
     assert(state[1] and state[1] > 0, "invalid numBuckets in state")
@@ -361,15 +361,14 @@ function LibCuckooFilter.Import(state)
     }, LibCuckooFilter)
 end
 
---- Estimate the false positive rate based on current load.
---- @return number Estimated false positive rate.
-function LibCuckooFilter:GetFalsePositiveRate()
+--- Estimate the current false positive rate (FPR) of the filter based on current load factor.
+--- @return number fpr Estimated false positive rate.
+function LibCuckooFilter:EstimateFalsePositiveRate()
     local loadFactor = self.itemCount / (self.numBuckets * self.bucketSize)
     if loadFactor >= 1 then
         return 1.0 -- Filter is full, FPR is 100%
     end
-    local fpr = (1 - exp(-2 * loadFactor)) ^ 2
-    return fpr
+    return (1 - exp(-2 * loadFactor)) ^ 2
 end
 
 -------------------------------------------------------------------------------
@@ -424,7 +423,7 @@ local function RunLibCuckooFilterTests()
     end
 
     local actualFPR = falsePositives / testCount
-    local estimatedFPR = testCf:GetFalsePositiveRate()
+    local estimatedFPR = testCf:EstimateFalsePositiveRate()
     print(string.format("Test 3 PASSED: FP Rate - Actual: %.4f, Estimated: %.4f", actualFPR, estimatedFPR))
     assert(actualFPR < 0.05, "Test 3 Failed: False positive rate too high")
 
