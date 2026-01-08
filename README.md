@@ -51,6 +51,12 @@ Measured by exporting the filter state after inserting 10,000 values, then seria
 
 Smaller is better. The smallest result is shown in **bold**.
 
+| Export Size | Serialized (Per Value) | Compressed (Per Value) |
+| - | - | - |
+| LibBloomFilter | 14.63KB (~1.50B) | 13.12KB (~1.35B) |
+| **LibPatternedBloomFilter** | 14.43KB (~1.48B) | 12.34KB (~1.26B) |
+| LibCuckooFilter | 35.88KB (~3.67B) | 30.09KB (~3.08B) |
+
 ## Installation
 
 To install LibCuckooFilter, simply download the `LibCuckooFilter.lua` file and include it in your WoW addon folder. Then, you can load it using LibStub in your addon code.
