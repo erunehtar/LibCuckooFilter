@@ -95,11 +95,12 @@ local newFilter = LibCuckooFilter.Import(state)
 
 ## API
 
-### LibCuckooFilter.New(capacity, bucketSize, fingerprintBits, maxKicks)
+### LibCuckooFilter.New(capacity, seed, bucketSize, fingerprintBits, maxKicks)
 
 Create a new Cuckoo Filter instance.
 
 - `capacity`: Capacity of the filter (expected number of values).
+- `seed`: (Optional) Seed for hash functions (default: 0).
 - `bucketSize`: (Optional) Number of entries per bucket (default: 4).
 - `fingerprintBits`: (Optional) Number of bits per fingerprint (default: 12).
 - `maxKicks`: (Optional) Maximum number of kicks during insertion (default: 512).

@@ -40,20 +40,22 @@ if not LibCuckooFilter then return end -- no upgrade needed
 
 -- Local lua references
 local assert, type, setmetatable, pairs, ipairs = assert, type, setmetatable, pairs, ipairs
-local band, bor, bxor, lshift, rshift = bit.band, bit.bor, bit.bxor, bit.lshift, bit.rshift
-local floor, ceil, log, exp, random = math.floor, math.ceil, math.log, math.exp, fastrandom
-local tostring, tonumber, strbyte = tostring, tonumber, strbyte
+local band, bxor, rshift = bit.band, bit.bxor, bit.rshift
+local ceil, log, exp, random = math.ceil, math.log, math.exp, fastrandom
+local tostring, strbyte = tostring, strbyte
 local tinsert, tremove = table.insert, table.remove
 
 -- Constants
-local LOG2 = log(2)
+local LOG2 = log(2)                 -- Natural log of 2
+local UINT32_MODULO = 2 ^ 32        -- Modulo for 32-bit arithmetic
+local DEFAULT_SEED = 0              -- Default seed for hash function
 local DEFAULT_BUCKET_SIZE = 4       -- Default entries per bucket
 local DEFAULT_FINGERPRINT_BITS = 12 -- Default bits per fingerprint
 local DEFAULT_MAX_KICKS = 512       -- Default maximum kicks during insertion
 
 --- Helper function: Find next power of 2
---- @param value number Input number.
---- @return number powerOfTwo Next power of two greater than or equal to value.
+--- @param value integer Input number.
+--- @return integer powerOfTwo Next power of two greater than or equal to value.
 local function NextPowerOfTwo(value)
     if value == 0 then
         return 1
@@ -61,33 +63,34 @@ local function NextPowerOfTwo(value)
     return 2 ^ ceil(log(value) / LOG2)
 end
 
---- Compute the hash of a value.
---- @param value any Value to hash.
---- @return number hash The computed hash value.
-local function Hash(value)
-    -- FNV-1a hash
+--- FNV-1a hash function (32-bit)
+--- @param value string Input string to hash.
+--- @param seed integer? Seed value.
+--- @return integer hash 32-bit hash value.
+local function FNV1a32(value, seed)
     local str = tostring(value)
-    local h = 2166136261 -- FNV-1a offset basis
-    for i = 1, #str do
-        h = bxor(h, strbyte(str, i))
-        h = (h * 16777619) % 4294967296 -- FNV-1a prime
+    local len = #str
+    local hash = 2166136261 + (seed or 0) * 13
+    for i = 1, len do
+        hash = bxor(hash, strbyte(str, i))
+        hash = (hash * 16777619) % UINT32_MODULO
     end
-    return h
+    return hash
 end
 
 --- Compute the fingerprint of a value.
 --- @param value any Value to compute the fingerprint for.
---- @return number fingerprint The computed fingerprint.
+--- @return integer fingerprint The computed fingerprint.
 local function Fingerprint(self, value)
     -- Use upper bits of hash for fingerprint to reduce correlation with bucket index
-    local h = Hash(value)
+    local h = FNV1a32(value, self.seed)
     local fp = band(rshift(h, 16), self.fingerprintMask)
     return fp == 0 and 1 or fp
 end
 
 --- Compute the bucket index for a given hash.
---- @param hash number Hash value.
---- @return number index The computed bucket index (1-based).
+--- @param hash integer Hash value.
+--- @return integer index The computed bucket index (1-based).
 local function BucketIndex(self, hash)
     return (hash % self.numBuckets) + 1
 end
@@ -95,9 +98,9 @@ end
 --- Compute the alternate bucket index for a given index and fingerprint.
 --- Uses partial-key Cuckoo hashing: i' = (i XOR hash(fp)) mod numBuckets
 --- This is bidirectional: alternate(alternate(i, fp), fp) = i
---- @param index number Original bucket index (1-based).
---- @param fingerprint number Fingerprint value.
---- @return number altIndex The computed alternate bucket index (1-based).
+--- @param index integer Original bucket index (1-based).
+--- @param fingerprint integer Fingerprint value.
+--- @return integer altIndex The computed alternate bucket index (1-based).
 local function AlternateBucketIndex(self, index, fingerprint)
     -- Mix the fingerprint to get a hash value
     local h = fingerprint * 0x5bd1e995
@@ -115,48 +118,53 @@ local function AlternateBucketIndex(self, index, fingerprint)
 end
 
 --- @class LibCuckooFilter Cuckoo Filter data structure.
---- @field New fun(capacity: number, bucketSize?: number, fingerprintBits?: number, maxKicks?: number): LibCuckooFilter
+--- @field New fun(capacity: integer, seed: integer?, bucketSize: number?, fingerprintBits: integer?, maxKicks: integer?): LibCuckooFilter
 --- @field Insert fun(self: LibCuckooFilter, value: any): boolean
 --- @field Contains fun(self: LibCuckooFilter, value: any): boolean
 --- @field Delete fun(self: LibCuckooFilter, value: any): boolean
 --- @field Clear fun(self: LibCuckooFilter)
---- @field Export fun(self: LibCuckooFilter): number[]
---- @field Import fun(state: number[]): LibCuckooFilter
+--- @field Export fun(self: LibCuckooFilter): integer[]
+--- @field Import fun(state: integer[]): LibCuckooFilter
 --- @field EstimateFalsePositiveRate fun(self: LibCuckooFilter): number
---- @field numBuckets number Number of buckets in the filter.
---- @field bucketSize number Number of entries per bucket.
---- @field fingerprintBits number Number of bits per fingerprint.
---- @field fingerprintMask number Bitmask for fingerprint extraction.
---- @field buckets table<number, number[]> Table of buckets (each bucket is an array of fingerprints).
---- @field itemCount number Number of items currently stored.
---- @field maxKicks number Maximum number of kicks during insertion.
+--- @field numBuckets integer Number of buckets in the filter.
+--- @field bucketSize integer Number of entries per bucket.
+--- @field fingerprintBits integer Number of bits per fingerprint.
+--- @field fingerprintMask integer Bitmask for fingerprint extraction.
+--- @field buckets table<integer, integer[]> Table of buckets (each bucket is an array of fingerprints).
+--- @field itemCount integer Number of items currently stored.
+--- @field maxKicks integer Maximum number of kicks during insertion.
 
 --- @class LibCuckooFilterState Compact representation of a Cuckoo Filter state.
---- @field [1] number Number of buckets in the filter.
---- @field [2] number Number of entries per bucket.
---- @field [3] number Number of bits per fingerprint.
---- @field [4] number Maximum number of kicks during insertion.
---- @field [5] table<number, number[]> Table of non-empty buckets (each bucket is an array of fingerprints).
+--- @field [1] integer Seed for the hash function.
+--- @field [2] integer Number of buckets in the filter.
+--- @field [3] integer Number of entries per bucket.
+--- @field [4] integer Number of bits per fingerprint.
+--- @field [5] integer Maximum number of kicks during insertion.
+--- @field [6] table<integer, integer[]> Table of non-empty buckets (each bucket is an array of fingerprints).
 
 LibCuckooFilter.__index = LibCuckooFilter
 
 --- Create a new Cuckoo Filter instance.
---- @param capacity number Capacity of the filter (expected number of values).
---- @param bucketSize number? Number of entries per bucket (default: 4).
---- @param fingerprintBits number? Number of bits per fingerprint (default: 12).
---- @param maxKicks number? Maximum number of kicks during insertion (default: 512).
+--- @param capacity integer Capacity of the filter (expected number of values).
+--- @param seed integer? Seed for the hash function (default: 0).
+--- @param bucketSize integer? Number of entries per bucket (default: 4).
+--- @param fingerprintBits integer? Number of bits per fingerprint (default: 12).
+--- @param maxKicks integer? Maximum number of kicks during insertion (default: 512).
 --- @return LibCuckooFilter instance The new Cuckoo Filter instance.
-function LibCuckooFilter.New(capacity, bucketSize, fingerprintBits, maxKicks)
+function LibCuckooFilter.New(capacity, seed, bucketSize, fingerprintBits, maxKicks)
     assert(capacity and capacity > 0, "capacity must be greater than 0")
+    seed = seed or DEFAULT_SEED
+    assert(type(seed) == "number", "seed must be a number")
     bucketSize = bucketSize or DEFAULT_BUCKET_SIZE
-    fingerprintBits = fingerprintBits or DEFAULT_FINGERPRINT_BITS
-    maxKicks = maxKicks or DEFAULT_MAX_KICKS
     assert(bucketSize > 0, "bucketSize must be positive")
+    fingerprintBits = fingerprintBits or DEFAULT_FINGERPRINT_BITS
     assert(fingerprintBits > 0 and fingerprintBits <= 16, "fingerprintBits must be between 1 and 16")
+    maxKicks = maxKicks or DEFAULT_MAX_KICKS
 
     -- Important: numBuckets must be power of 2 for XOR-based alternate bucket to work
     local numBuckets = NextPowerOfTwo(ceil(capacity / bucketSize))
     return setmetatable({
+        seed = seed,
         numBuckets = numBuckets,
         bucketSize = bucketSize,
         fingerprintBits = fingerprintBits,
@@ -173,7 +181,7 @@ end
 function LibCuckooFilter:Insert(value)
     assert(value ~= nil, "value cannot be nil")
     local fingerprint = Fingerprint(self, value)
-    local hash = Hash(value)
+    local hash = FNV1a32(value, self.seed)
     local i1 = BucketIndex(self, hash)
     local i2 = AlternateBucketIndex(self, i1, fingerprint)
 
@@ -237,7 +245,7 @@ end
 function LibCuckooFilter:Contains(value)
     assert(value ~= nil, "value cannot be nil")
     local fingerprint = Fingerprint(self, value)
-    local hash = Hash(value)
+    local hash = FNV1a32(value, self.seed)
     local i1 = BucketIndex(self, hash)
     local i2 = AlternateBucketIndex(self, i1, fingerprint)
 
@@ -265,7 +273,7 @@ end
 function LibCuckooFilter:Delete(value)
     assert(value ~= nil, "value cannot be nil")
     local fingerprint = Fingerprint(self, value)
-    local hash = Hash(value)
+    local hash = FNV1a32(value, self.seed)
     local i1 = BucketIndex(self, hash)
     local i2 = AlternateBucketIndex(self, i1, fingerprint)
 
@@ -312,18 +320,19 @@ end
 --- @return LibCuckooFilterState state Compact representation of the filter.
 function LibCuckooFilter:Export()
     local state = {}
-    state[1] = self.numBuckets
-    state[2] = self.bucketSize
-    state[3] = self.fingerprintBits
-    state[4] = self.maxKicks
+    state[1] = self.seed
+    state[2] = self.numBuckets
+    state[3] = self.bucketSize
+    state[4] = self.fingerprintBits
+    state[5] = self.maxKicks
 
-    local nonEmptyBuckets = {}
+    local nonEmptyBuckets = {} --- @type table<integer, integer[]>
     for bucketIdx, bucket in pairs(self.buckets) do
         if #bucket > 0 then
             nonEmptyBuckets[bucketIdx] = bucket
         end
     end
-    state[5] = nonEmptyBuckets
+    state[6] = nonEmptyBuckets
 
     return state
 end
@@ -333,19 +342,21 @@ end
 --- @return LibCuckooFilter instance The imported Cuckoo Filter instance.
 function LibCuckooFilter.Import(state)
     assert(state and type(state) == "table", "state must be a table")
-    assert(state[1] and state[1] > 0, "invalid numBuckets in state")
-    assert(state[2] and state[2] > 0, "invalid bucketSize in state")
-    assert(state[3] and state[3] > 0, "invalid fingerprintBits in state")
-    assert(state[4] and state[4] > 0, "invalid maxKicks in state")
-    assert(state[5] and type(state[5]) == "table", "invalid buckets in state")
-    local numBuckets = state[1]
-    local bucketSize = state[2]
-    local fingerprintBits = state[3]
-    local maxKicks = state[4]
-    local buckets = state[5]
+    assert(state[1] ~= nil, "invalid seed in state")
+    assert(state[2] and state[2] > 0, "invalid numBuckets in state")
+    assert(state[3] and state[3] > 0, "invalid bucketSize in state")
+    assert(state[4] and state[4] > 0, "invalid fingerprintBits in state")
+    assert(state[5] and state[5] > 0, "invalid maxKicks in state")
+    assert(state[6] and type(state[6]) == "table", "invalid buckets in state")
+    local seed = state[1]
+    local numBuckets = state[2]
+    local bucketSize = state[3]
+    local fingerprintBits = state[4]
+    local maxKicks = state[5]
+    local buckets = state[6]
 
     -- Recalculate fingerprint mask
-    local fingerprintMask = (2 ^ state[3]) - 1
+    local fingerprintMask = (2 ^ fingerprintBits) - 1
 
     -- Recalculate item count
     local itemCount = 0
@@ -354,6 +365,7 @@ function LibCuckooFilter.Import(state)
     end
 
     return setmetatable({
+        seed = seed,
         numBuckets = numBuckets,
         bucketSize = bucketSize,
         fingerprintBits = fingerprintBits,
@@ -482,6 +494,35 @@ local function RunLibCuckooFilterTests()
     assert(cf7:Contains("keep3"), "Test 7 Failed: keep3 should still be present")
     assert(not cf7:Contains("remove1"), "Test 7 Failed: remove1 should be deleted")
     print("Test 7 PASSED: Deletion isolation")
+
+    -- Test 8: Different seeds produce different filters
+    local pbf8a = LibCuckooFilter.New(100, 123)
+    local pbf8b = LibCuckooFilter.New(100, 456)
+    pbf8a:Insert("seed_test")
+    pbf8b:Insert("seed_test")
+    local export8a = pbf8a:Export()
+    local export8b = pbf8b:Export()
+    local export8aBuckets = export8a[6] --- @type table<integer, integer[]>
+    local export8bBuckets = export8b[6] --- @type table<integer, integer[]>
+    local different = false
+    for bucketIdx, bucket in pairs(export8aBuckets) do
+        local otherBucket = export8bBuckets[bucketIdx]
+        if otherBucket then
+            for i, fp in ipairs(bucket) do
+                if fp ~= otherBucket[i] then
+                    different = true
+                    break
+                end
+            end
+        else
+            different = true
+            break
+        end
+        if different then break end
+    end
+
+    assert(different, "Test 8 Failed: Filters with different seeds should differ")
+    print("Test 8 PASSED: Different seeds produce different filters")
 
     print("=== All LibCuckooFilter Tests PASSED ===\n")
 end
