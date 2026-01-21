@@ -32,7 +32,7 @@
 -- Uses FNV-1a hash function and bidirectional XOR-based alternate bucket calculation.
 -- Supports insertion, membership testing, deletion, clear, export/import, and false positive rate estimation.
 
-local MAJOR, MINOR = "LibCuckooFilter", 2
+local MAJOR, MINOR = "LibCuckooFilter", 3
 assert(LibStub, MAJOR .. " requires LibStub")
 
 local LibCuckooFilter = LibStub:NewLibrary(MAJOR, MINOR)
