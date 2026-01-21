@@ -147,7 +147,7 @@ LibCuckooFilter.__index = LibCuckooFilter
 --- @param maxKicks number? Maximum number of kicks during insertion (default: 512).
 --- @return LibCuckooFilter instance The new Cuckoo Filter instance.
 function LibCuckooFilter.New(capacity, bucketSize, fingerprintBits, maxKicks)
-    assert(capacity and capacity > 0, "numItems must be a positive number")
+    assert(capacity and capacity > 0, "capacity must be greater than 0")
     bucketSize = bucketSize or DEFAULT_BUCKET_SIZE
     fingerprintBits = fingerprintBits or DEFAULT_FINGERPRINT_BITS
     maxKicks = maxKicks or DEFAULT_MAX_KICKS
