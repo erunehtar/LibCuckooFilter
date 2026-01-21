@@ -18,14 +18,14 @@ Smaller time is better. The fastest result is shown in **bold**.
 | New | Median | Average | Min | Max | Total |
 | - | - | - | - | - | - |
 | LibBloomFilter | 58.40us | 60.38us | 41.70us | 966.10us | 603.75ms |
-| LibPatternedBloomFilter | 508.90us | 572.17us | 366.00us | 3.88ms | 5721.69ms |
-| **LibCuckooFilter** | 1.00us | 1.34us | 0.70us | 122.60us | 13.41ms |
+| LibPatternedBloomFilter | 47.00us | 48.56us | 43.00us | 1.51ms | 485.58ms |
+| **LibCuckooFilter** | 1.00us | 1.24us | 0.70us | 63.30us | 12.40ms |
 
 | Insert | Median | Average | Min | Max | Total |
 | - | - | - | - | - | - |
 | LibBloomFilter | 11.80us | 15.28us | 11.40us | 160.00us | 152.76ms |
 | **LibPatternedBloomFilter** | 2.20us | 2.22us | 2.00us | 19.20us | 22.23ms |
-| LibCuckooFilter | 3.80us | 3.90us | 3.50us | 59.70us | 38.97ms |
+| LibCuckooFilter | 3.80us | 3.86us | 3.60us | 51.60us | 38.57ms |
 
 | Contains | Median | Average | Min | Max | Total |
 | - | - | - | - | - | - |
@@ -42,8 +42,8 @@ Smaller time is better. The fastest result is shown in **bold**.
 | Import | Median | Average | Min | Max | Total |
 | - | - | - | - | - | - |
 | **LibBloomFilter** | 0.90us | 0.88us | 0.70us | 3.60us | 8.84ms |
-| LibPatternedBloomFilter | 406.20us | 448.20us | 319.10us | 2.87ms | 4482.02ms |
-| LibCuckooFilter | 334.10us | 336.10us | 324.70us | 712.90us | 3361.02ms |
+| LibPatternedBloomFilter | 2.10us | 2.11us | 1.50us | 308.60us | 21.15ms |
+| LibCuckooFilter | 334.10us | 335.83us | 329.70us | 541.90us | 3358.29ms |
 
 ## Export Size Comparison
 
@@ -53,9 +53,9 @@ Smaller is better. The smallest result is shown in **bold**.
 
 | Export Size | Serialized (Per Value) | Compressed (Per Value) |
 | - | - | - |
-| LibBloomFilter | 14.63KB (~1.50B) | 13.12KB (~1.35B) |
-| **LibPatternedBloomFilter** | 14.43KB (~1.48B) | 12.34KB (~1.26B) |
-| LibCuckooFilter | 35.88KB (~3.67B) | 30.09KB (~3.08B) |
+| LibBloomFilter | 14.63KB (~1.50B) | 13.12KB (~1.34B) |
+| **LibPatternedBloomFilter** | 14.42KB (~1.48B) | 12.33KB (~1.26B) |
+| LibCuckooFilter | 35.80KB (~3.67B) | 30.04KB (~3.08B) |
 
 ## Installation
 
@@ -97,55 +97,59 @@ local newFilter = LibCuckooFilter.Import(state)
 
 ### LibCuckooFilter.New(capacity, bucketSize, fingerprintBits, maxKicks)
 
-Creates a new Cuckoo Filter instance.
+Create a new Cuckoo Filter instance.
 
-- `capacity`: Capacity of the Cuckoo Filter (expected number of values).
+- `capacity`: Capacity of the filter (expected number of values).
 - `bucketSize`: (Optional) Number of entries per bucket (default: 4).
 - `fingerprintBits`: (Optional) Number of bits per fingerprint (default: 12).
 - `maxKicks`: (Optional) Maximum number of kicks during insertion (default: 512).
-- Returns: A new Cuckoo Filter instance.
+- Returns: The new Cuckoo Filter instance.
 
 ### filter:Insert(value)
 
-Insert a value into the Cuckoo Filter.
+Insert a value into the filter.
 
-- `value`: The value to insert (any).
+- `value`: Value to insert.
+- Returns: True if insertion succeeded, false if the filter is full.
 
 ### filter:Contains(value)
 
-Determine if a value is possibly in the Cuckoo Filter.
+Determine if a value is possibly in the filter.
 
-- `value`: The value to check (any).
-- Returns: `true` if the value is possibly in the set, `false` if definitely not.
+- `value`: Value to check.
+- Returns: True if value might be in the set, false if definitely not.
 
 ### filter:Delete(value)
 
-Delete a value from the cuckoo filter.
+Delete a value from the filter.
 
-- `value`: The value to delete (any).
+Note: May cause false negatives if the same fingerprint was inserted multiple times.
+
+- `value`: Value to delete.
+- Returns: True if deletion succeeded, false if value not found.
 
 ### filter:Export()
 
-Export the current state of the Cuckoo Filter.
+Export the current state of the filter.
 
-- Returns: A compact representation of the Cuckoo Filter state.
+- Returns: Compact representation of the filter.
 
 ### LibCuckooFilter.Import(state)
 
-Import the Cuckoo Filter state from a compact representation.
+Import a new Cuckoo Filter from a compact representation.
 
-- `state`: A compact representation of the Cuckoo Filter state.
-- Returns: A new Cuckoo Filter instance.
+- `state`: Compact representation of the filter.
+- Returns: The imported Cuckoo Filter instance.
 
 ### filter:Clear()
 
 Clear all values from the Cuckoo Filter.
 
-### filter:GetFalsePositiveRate()
+### filter:EstimateFalsePositiveRate()
 
-Estimate the current false positive rate of the patterned bloom filter.
+Estimate the current false positive rate (FPR) of the filter based on current load factor.
 
-- Returns: Estimated false positive rate (number).
+- Returns: Estimated false positive rate.
 
 ## License
 
