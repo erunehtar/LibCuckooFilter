@@ -47,6 +47,9 @@ local tinsert, tremove = table.insert, table.remove
 
 -- Constants
 local LOG2 = log(2)
+local DEFAULT_BUCKET_SIZE = 4       -- Default entries per bucket
+local DEFAULT_FINGERPRINT_BITS = 12 -- Default bits per fingerprint
+local DEFAULT_MAX_KICKS = 512       -- Default maximum kicks during insertion
 
 --- Helper function: Find next power of 2
 --- @param value number Input number.
@@ -145,9 +148,9 @@ LibCuckooFilter.__index = LibCuckooFilter
 --- @return LibCuckooFilter instance The new Cuckoo Filter instance.
 function LibCuckooFilter.New(capacity, bucketSize, fingerprintBits, maxKicks)
     assert(capacity and capacity > 0, "numItems must be a positive number")
-    bucketSize = bucketSize or 4            -- Default: 4 entries per bucket
-    fingerprintBits = fingerprintBits or 12 -- Default: 12 bits per fingerprint
-    maxKicks = maxKicks or 512              -- Default: 512 maximum kicks during insertion
+    bucketSize = bucketSize or DEFAULT_BUCKET_SIZE
+    fingerprintBits = fingerprintBits or DEFAULT_FINGERPRINT_BITS
+    maxKicks = maxKicks or DEFAULT_MAX_KICKS
     assert(bucketSize > 0, "bucketSize must be positive")
     assert(fingerprintBits > 0 and fingerprintBits <= 16, "fingerprintBits must be between 1 and 16")
 
